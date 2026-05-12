@@ -92,10 +92,6 @@ class Bomb(pg.sprite.Sprite):
 
 
 class Beam(pg.sprite.Sprite):
-    def __init__(self, bird: Bird):
-    """
-    ビームに関するクラス
-    """
     def __init__(self, bird: Bird, angle0: int = 0):
         """
         ビーム画像Surfaceを生成する
@@ -148,7 +144,26 @@ class Explosion(pg.sprite.Sprite):
         if self.life < 0:
             self.kill()
 
+class Gravity(pg.sprite.Sprite):
+    """
+    画面全体を覆う重力場に関するクラス
+    """
+    def __init__(self,life: int):
+        super().__init__()
+        self.image = pg.Surface((WIDTH,HEIGHT)) #空のSurfaceインスタンスを作成する
+        pg.draw.rect(self.image, (0,0,0),(0,0,WIDTH,HEIGHT)) #画面全体を真っ黒にする
+        self.image.set_alpha(128) #透明度を設定
 
+        self.rect = self.image.get_rect()
+        self.life = life
+        
+    def update(self):
+        """
+        発動時間を1減算し、0未満になったら消滅させる
+        """
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
 class Enemy(pg.sprite.Sprite):
     imgs = [pg.image.load(f"fig/alien{i}.png") for i in range(1, 4)]
     
@@ -286,6 +301,7 @@ def main():
     emys = pg.sprite.Group()
     shields = pg.sprite.Group()
     emp_effect = None  # EMPエフェクト保持用
+    gravities = pg.sprite.Group() #重力場グループ
 
     tmr = 0
     clock = pg.time.Clock()
@@ -313,15 +329,32 @@ def main():
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:
-                if key_lst[pg.K_LSHIFT]:
-                    # 追加機能6：左シフトキーを押しながらスペースキーを押すと、こうかとんの向きに応じて複数のビームを発射する
-                    neobeam = NeoBeam(bird, 5)
-                    beams.add(neobeam.gen_beams())
-                else:
-                    beams.add(Beam(bird))
+            if key_lst[pg.K_LSHIFT]:
+                # 追加機能6：左シフトキーを押しながらスペースキーを押すと、こうかとんの向きに応じて複数のビームを発射する
+                neobeam = NeoBeam(bird, 5)
+                beams.add(neobeam.gen_beams())
+            # else:
+            #     beams.add(Beam(bird))
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0: 
+            if event.type == pg.KEYDOWN and event.key == pg.K_RETURN and score.value > 200: #リターンキー押したときかつスコアが200より多いとき
+                score.value -= 200 #スコアを200消費
+                gravities.add(Gravity(400)) #400フレーム発動
+
+        screen.blit(bg_img, [0, 0])
+
+        #重力場と爆弾・敵の衝突判定
+        for emy in pg.sprite.groupcollide(emys, gravities, True, False).keys(): #敵と重力場の衝突判定
+            exps.add(Explosion(emy, 100)) #爆発エフェクトを表示
+            score.value += 10 #スコアを10増やす
+            bird.change_img(6, screen) #こうかとんを喜び画像にする
+
+        for bomb in pg.sprite.groupcollide(bombs, gravities, True, False).keys(): #爆弾と重力場の衝突判定
+            exps.add(Explosion(bomb, 50)) #爆発エフェクトを表示
+            score.value += 1 #スコアを1増やす
+
+        if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
 
         for emy in emys:
@@ -382,6 +415,8 @@ def main():
         if emp_effect:
             emp_effect.update(screen)
 
+        gravities.update() #重力場の更新
+        gravities.draw(screen) #重力場の描画
         score.update(screen)
         
         # ライフの表示更新
