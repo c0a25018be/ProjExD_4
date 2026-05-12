@@ -252,16 +252,11 @@ class Shield(pg.sprite.Sprite):
         
         width = 20
         height = bird.rect.height*2
-        self.image = pg.Surface((width,height))
-        
-        pg.draw.rect(self.image, (0, 0 ,255), (0, 0, width, height))
-        
-        vx,vy= bird.dire
-        
-        angle = math.degrees(math.atan2(-vy, vx))
-        
+        self.image = pg.Surface((width,height))        
+        pg.draw.rect(self.image, (0, 0 ,255), (0, 0, width, height))        
+        vx,vy= bird.dire        
+        angle = math.degrees(math.atan2(-vy, vx))        
         self.image = pg.transform.rotozoom(self.image, angle, 1.0)
-        
         self.image.set_colorkey((0, 0, 0))
         
         self.rect = self.image.get_rect()
