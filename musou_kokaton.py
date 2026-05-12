@@ -93,9 +93,18 @@ class Bomb(pg.sprite.Sprite):
 
 class Beam(pg.sprite.Sprite):
     def __init__(self, bird: Bird):
+    """
+    ビームに関するクラス
+    """
+    def __init__(self, bird: Bird, angle0: int = 0):
+        """
+        ビーム画像Surfaceを生成する
+        引数 bird：ビームを放つこうかとん
+        引数 angle0：ビームの発射角度に対する加算分
+        """
         super().__init__()
         self.vx, self.vy = bird.dire
-        angle = math.degrees(math.atan2(-self.vy, self.vx))
+        angle = math.degrees(math.atan2(-self.vy, self.vx)) + angle0
         self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), angle, 1.0)
         self.vx = math.cos(math.radians(angle))
         self.vy = -math.sin(math.radians(angle))
@@ -108,6 +117,20 @@ class Beam(pg.sprite.Sprite):
         self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
         if check_bound(self.rect) != (True, True):
             self.kill()
+
+
+class NeoBeam:
+    """
+    複数の異なる角度のビームを生成するクラス
+    """
+    def __init__(self, bird: Bird, num: int):
+        self.bird = bird
+        self.num = num
+
+    def gen_beams(self) -> list[Beam]:
+        step = 100 // (self.num - 1) if self.num > 1 else 0
+        beams = [Beam(self.bird, angle) for angle in range(-50, +51, step)]
+        return beams
 
 
 class Explosion(pg.sprite.Sprite):
@@ -290,6 +313,15 @@ def main():
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:
+                if key_lst[pg.K_LSHIFT]:
+                    # 追加機能6：左シフトキーを押しながらスペースキーを押すと、こうかとんの向きに応じて複数のビームを発射する
+                    neobeam = NeoBeam(bird, 5)
+                    beams.add(neobeam.gen_beams())
+                else:
+                    beams.add(Beam(bird))
+        screen.blit(bg_img, [0, 0])
+
+        if tmr%200 == 0: 
             emys.add(Enemy())
 
         for emy in emys:
