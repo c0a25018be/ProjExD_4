@@ -83,6 +83,7 @@ class Bomb(pg.sprite.Sprite):
         self.rect.centerx = emy.rect.centerx
         self.rect.centery = emy.rect.centery+emy.rect.height//2
         self.speed = 6
+        self.state = "active"  # 追加：爆弾の状態（通常はactive）
 
     def update(self):
         self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
@@ -210,6 +211,42 @@ class Life:
             screen.blit(self.image, (WIDTH - 70 - (i * 40), HEIGHT - 70))
 
 
+class EMP:
+    """
+    追加機能3：電磁パルス（EMP）に関するクラス
+    """
+    def __init__(self, enemies: pg.sprite.Group, bombs: pg.sprite.Group, screen: pg.Surface):
+        """
+        発動時に存在する敵機と爆弾を無効化する
+        """
+        # 敵機の無効化
+        for emy in enemies:
+            emy.interval = float("inf")  # 爆弾投下不能にする
+            # ラプラシアンフィルタを掛ける
+            emy.image = pg.transform.laplacian(emy.image)
+            emy.image.set_colorkey((0, 0, 0))
+
+        # 爆弾の無効化
+        for bomb in bombs:
+            bomb.speed /= 2          # 動きを遅くする
+            bomb.state = "inactive"  # ぶつかっても爆発しない状態にする
+
+        # エフェクト：画面全体に透明度のある黄色の矩形を表示
+        self.image = pg.Surface((WIDTH, HEIGHT))
+        pg.draw.rect(self.image, (255, 255, 0), (0, 0, WIDTH, HEIGHT))
+        self.image.set_alpha(100)  # 透明度
+        self.rect = self.image.get_rect()
+        self.life = 3  # 0.05秒程度（60FPS想定で約3フレーム）
+
+    def update(self, screen: pg.Surface):
+        """
+        エフェクトを描画し、lifeを減らす
+        """
+        if self.life > 0:
+            screen.blit(self.image, self.rect)
+            self.life -= 1
+
+
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -225,6 +262,7 @@ def main():
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
     shields = pg.sprite.Group()
+    emp_effect = None  # EMPエフェクト保持用
 
     tmr = 0
     clock = pg.time.Clock()
@@ -241,6 +279,14 @@ def main():
                 if score.value > 50 and len(shields) == 0:
                     shields.add(Shield(bird, 400))
                     score.value -= 50             
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_SPACE:
+                    beams.add(Beam(bird))
+                # 追加機能3：EMP発動条件
+                if event.key == pg.K_e and score.value >= 20:
+                    score.value -= 20
+                    emp_effect = EMP(emys, bombs, screen)
+
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:
@@ -280,6 +326,15 @@ def main():
         
         for bomb in pg.sprite.groupcollide(bombs, shields, True, False).keys():
             exps.add(Explosion(bomb, 50)) 
+            if bomb.state == "active":  # EMPで無効化されていない場合のみ終了
+                bird.change_img(8, screen)  # こうかとん悲しみエフェクト
+                score.update(screen)
+                pg.display.update()
+                time.sleep(2)
+                return
+            else:
+                # EMP無効化中の爆弾に当たった場合は、爆発せずに消滅（実装例より）
+                continue
 
         bird.update(key_lst, screen)
         beams.update()
@@ -290,6 +345,11 @@ def main():
         bombs.draw(screen)
         exps.update()
         exps.draw(screen)
+        
+        # EMPエフェクトの更新と描画
+        if emp_effect:
+            emp_effect.update(screen)
+
         score.update(screen)
         
         # ライフの表示更新
