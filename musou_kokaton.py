@@ -157,7 +157,34 @@ class Score:
     def update(self, screen: pg.Surface):
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         screen.blit(self.image, self.rect)
-
+        
+        
+class Shield(pg.sprite.Sprite):
+    """
+    こうかとんを守る防壁に関するクラス
+    """
+    def __init__(self, bird: Bird, life: int):
+        super().__init__()
+        self.life = life
+        
+        width = 20
+        height = bird.rect.height*2
+        self.image = pg.Surface((width,height))        
+        pg.draw.rect(self.image, (0, 0 ,255), (0, 0, width, height))        
+        vx,vy= bird.dire        
+        angle = math.degrees(math.atan2(-vy, vx))        
+        self.image = pg.transform.rotozoom(self.image, angle, 1.0)
+        self.image.set_colorkey((0, 0, 0))
+        
+        self.rect = self.image.get_rect()
+        self.rect.centerx = bird.rect.centerx + bird.rect.width * vx
+        self.rect.centery = bird.rect.centery + bird.rect.height * vy
+        
+    def update(self):
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
+    
 
 # --- 追加機能1：Lifeクラス ---
 class Life:
@@ -197,6 +224,7 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+    shields = pg.sprite.Group()
 
     tmr = 0
     clock = pg.time.Clock()
@@ -209,6 +237,10 @@ def main():
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
         
+            if event.type == pg.KEYDOWN and event.key == pg.K_s:
+                if score.value > 50 and len(shields) == 0:
+                    shields.add(Shield(bird, 400))
+                    score.value -= 50             
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:
@@ -239,6 +271,15 @@ def main():
                 pg.display.update()
                 time.sleep(2)
                 return
+        for bomb in pg.sprite.spritecollide(bird, bombs, True):  # こうかとんと衝突した爆弾リスト
+            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
+            score.update(screen)
+            pg.display.update()
+            time.sleep(2)
+            return
+        
+        for bomb in pg.sprite.groupcollide(bombs, shields, True, False).keys():
+            exps.add(Explosion(bomb, 50)) 
 
         bird.update(key_lst, screen)
         beams.update()
@@ -254,6 +295,8 @@ def main():
         # ライフの表示更新
         life.update(screen)
         
+        shields.update()
+        shields.draw(screen) 
         pg.display.update()
         tmr += 1
         clock.tick(50)
